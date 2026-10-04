@@ -151,7 +151,9 @@ The root build checks `api` and `gradle-plugin` automatically. Tool versions liv
 
 ### JitPack publishing
 
-`jitpack.yml` selects JDK 21, initializes the WIT submodule, and uses uv to provide Python 3.13 while running the Gradle build and local Maven publication tasks. The JitPack environment supplies the repository group, name, and requested version through `GROUP`, `ARTIFACT`, and `VERSION`; these become `pumpkinMavenGroup` and `pumpkin_api_version` Gradle properties for both modules.
+`jitpack.yml` selects JDK 21 and uses uv to provide Python 3.13. `gradle/jitpack-build.sh` fetches the exact WIT revision recorded in the build commit into a fresh checkout, avoiding stale submodule Git paths in JitPack's workspace. For JitPack's older glibc, it builds the pinned `wit-bindgen` and `wasm-tools` versions with Rust 1.88.0, enabling only the features needed for binding generation. This Rust installation is specific to JitPack; ordinary API builds still use the prebuilt tools.
+
+The script runs the Gradle build and local Maven publication tasks. The JitPack environment supplies the repository group, name, and requested version through `GROUP`, `ARTIFACT`, and `VERSION`; these become `pumpkinMavenGroup` and `pumpkin_api_version` Gradle properties for both modules. Setup stops immediately if any command fails.
 
 The published module coordinates are `com.github.UDouble-Factory.pumpkin-api-java:pumpkin-api-java:<jitpack-version>` for the API and `com.github.UDouble-Factory.pumpkin-api-java:gradle-plugin:<jitpack-version>` for the build plugin. The consumer uses `useModule(...)` to resolve the plugin directly without relying on its original plugin marker coordinates.
 
