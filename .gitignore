@@ -27,6 +27,7 @@
 /gradle-plugin/build/
 /example/build/
 /example/.gradle/
+/binding-generator/__pycache__/
 
 .idea
 .kotlin

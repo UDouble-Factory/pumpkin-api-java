@@ -1,4 +1,4 @@
-rootProject.name = "pumpkin-api-kt"
+rootProject.name = "pumpkin-api-java"
 
 pluginManagement {
     resolutionStrategy {

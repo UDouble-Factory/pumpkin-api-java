@@ -1,123 +1,82 @@
 name: Main
+
 on:
   push:
     branches: [master]
   pull_request:
   workflow_dispatch:
   workflow_run:
-    types:
-      - completed
-    workflows:
-      - "Update WIT"
+    types: [completed]
+    workflows: [Update WIT]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  main:
-    name: Build, test, and release
+  build:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           submodules: true
-
-      - name: Set temporary build paths
-        run: |
-          echo "PUMPKIN_CI_REPOSITORY=$RUNNER_TEMP/pumpkin-maven" >> "$GITHUB_ENV"
-
-      - name: Read pinned tool versions
-        id: tools
-        run: |
-          while IFS='=' read -r name version; do
-            echo "$name=$version" >> "$GITHUB_OUTPUT"
-          done < gradle/tool-versions.properties
-
-      - name: Set up Java/Kotlin
-        uses: actions/setup-java@v6
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "25"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+          java-version: '21'
+      - uses: actions/setup-python@v6
         with:
-          # PRs reuse the default-branch cache without updating it.
+          python-version: '3.13'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
           cache-read-only: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
-
-      - name: Cache binding generator
-        uses: actions/cache@v6
+      - uses: actions/cache@v6
         with:
-          path: api/tools/wit-bindgen/${{ steps.tools.outputs.witBindgenRevision }}
-          key: ${{ runner.os }}-${{ runner.arch }}-wit-bindgen-${{ steps.tools.outputs.witBindgenRevision }}
-
-      - name: Cache consumer tools
-        uses: actions/cache@v6
-        with:
-          path: example/build/tools/wasm-tools/${{ steps.tools.outputs.wasmToolsVersion }}
-          key: ${{ runner.os }}-${{ runner.arch }}-wasm-tools-${{ steps.tools.outputs.wasmToolsVersion }}
-
-      - name: Clear old cached build artifacts
-        run: |
-          set -eux
-
-          rm -f api/build/libs/*
-          rm -f gradle-plugin/build/libs/*
-
-      - name: Build and publish development packages
-        run: |
-          ./gradlew :api:build :gradle-plugin:build :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal \
-            -Dmaven.repo.local="$PUMPKIN_CI_REPOSITORY" --build-cache --no-daemon
-
-      - name: Build and validate example component
-        run: ./example/gradlew -p example build --build-cache --no-daemon
-
-      - name: Set GITHUB_RELEASE_TAG & ARTIFACT_ID
-        run: |
-          set -eux
-          if [[ '${{ github.ref }}' = refs/tags/v* ]]; then
-            tag='${{ github.ref }}'
-            tag="${tag:10}"
-            artifactID="${tag:1}"
-          else
-            tag=CI
-            artifactID='${{ github.sha }}'
-            artifactID="${artifactID:0:7}"
-          fi
-          echo "GITHUB_RELEASE_TAG=$tag" >> $GITHUB_ENV
-          echo "ARTIFACT_ID=$artifactID" >> $GITHUB_ENV
-
-      - name: Copy & rename artifacts
-        run: |
-          set -eux
-
-          mkdir artifacts
-
-          cp api/build/libs/pumpkin-api-kt-wasm-wasi-*.klib artifacts/pumpkin-api-kt-wasm-wasi-${ARTIFACT_ID}.klib
-          cp api/build/libs/pumpkin-api-kt-wasm-wasi-*-sources.jar artifacts/pumpkin-api-kt-wasm-wasi-${ARTIFACT_ID}-sources.jar
-          cp gradle-plugin/build/libs/pumpkin-api-kt-gradle-plugin-*.jar artifacts/pumpkin-api-kt-gradle-plugin-${ARTIFACT_ID}.jar
-
-      - name: Upload artifacts
+          path: |
+            api/tools
+            ~/.gradle/caches/pumpkin-java/tools
+          key: ${{ runner.os }}-${{ runner.arch }}-pumpkin-java-${{ hashFiles('gradle/tool-versions.properties') }}
+      - name: Select isolated Maven repository
+        run: echo "PUMPKIN_CI_REPOSITORY=$RUNNER_TEMP/pumpkin-maven" >> "$GITHUB_ENV"
+      - name: Build, test and publish development packages
+        run: ./gradlew build :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal -Dmaven.repo.local="$PUMPKIN_CI_REPOSITORY" --no-daemon
+      - name: Build Java example
+        run: ./gradlew -p example build --no-daemon
+      - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
-          name: kotlin-dist
-          path: artifacts/*
+          name: java-distributions-${{ runner.os }}
+          path: |
+            api/build/libs/*.jar
+            gradle-plugin/build/libs/*.jar
+            example/build/pumpkin-example.wasm
 
-      - name: Upload artifacts to release
-        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
-        uses: ncipollo/release-action@v1
+  release:
+    needs: build
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          tag: ${{ env.GITHUB_RELEASE_TAG }}
-          artifacts: artifacts/*
+          name: java-distributions-Linux
+          path: artifacts
+      - uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'CI' }}
+          artifacts: artifacts/**/*.jar,artifacts/**/*.wasm
           allowUpdates: true
-          omitPrereleaseDuringUpdate: true
           omitName: true
           omitBody: true
           omitDraftDuringUpdate: true

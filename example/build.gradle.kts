@@ -1,8 +1,6 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-
 plugins {
-    kotlin("multiplatform") version "2.4.0"
-    id("io.github.pumpkin-mc.plugin") version "0.1.1"
+    java
+    id("io.github.udouble-factory.pumpkin") version "0.1.1"
 }
 
 repositories {
@@ -15,12 +13,14 @@ repositories {
     mavenCentral()
 }
 
-kotlin {
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmWasi {
-        nodejs()
-        binaries.executable()
-    }
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.compileJava {
+    options.release.set(17)
+    options.encoding = "UTF-8"
 }
 
 pumpkin {

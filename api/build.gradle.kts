@@ -1,132 +1,99 @@
-import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.jvm.tasks.Jar
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import java.util.Properties
-import java.util.concurrent.TimeUnit
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
+    `java-library`
     `maven-publish`
 }
 
-group = "io.github.pumpkin-mc"
+val toolVersions = Properties().apply {
+    rootProject.file("gradle/tool-versions.properties").inputStream().use { load(it) }
+}
+
+group = "io.github.udouble-factory"
 version = providers.gradleProperty("pumpkinApiVersion").getOrElse("0.1.1")
 
 base {
-    archivesName.set("pumpkin-api-kt")
+    archivesName.set("pumpkin-api-java")
 }
 
 repositories {
     mavenCentral()
 }
 
-kotlin {
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmWasi {
-        nodejs()
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+}
+
+dependencies {
+    api("org.teavm:teavm-interop:${toolVersions.getProperty("teaVmVersion")}")
+    testImplementation(platform("org.junit:junit-bom:5.13.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+val generatedBindings = layout.buildDirectory.dir("generated")
+val generateWitBindings by tasks.registering(Exec::class) {
+    inputs.dir(rootProject.layout.projectDirectory.dir("wit/v0.1"))
+    inputs.files(rootProject.fileTree("binding-generator") { include("*.py") })
+    inputs.file(rootProject.layout.projectDirectory.file("gradle/tool-versions.properties"))
+    outputs.dir(generatedBindings)
+
+    commandLine(
+        if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3",
+        "-X", "utf8",
+        rootProject.file("binding-generator/build.py").absolutePath,
+        "--wit", rootProject.file("wit/v0.1").absolutePath,
+        "--output", generatedBindings.get().asFile.absolutePath,
+        "--cache", layout.projectDirectory.dir("tools").asFile.absolutePath,
+        "--versions", rootProject.file("gradle/tool-versions.properties").absolutePath,
+    )
+}
+
+sourceSets.main {
+    java.srcDir(generatedBindings.map { it.dir("java") })
+}
+
+tasks.compileTestJava {
+    options.encoding = "UTF-8"
+}
+
+tasks.compileJava {
+    dependsOn(generateWitBindings)
+    options.release.set(17)
+    options.encoding = "UTF-8"
+}
+
+tasks.processResources {
+    dependsOn(generateWitBindings)
+    from(generatedBindings.map { it.dir("native") }) {
+        into("pumpkin/native")
     }
+    from(generatedBindings.map { it.file("manifest.json") }) {
+        into("pumpkin")
+    }
+    from(rootProject.file("wit/v0.1")) {
+        into("pumpkin/wit")
+    }
+    from(rootProject.file("wasi_snapshot_preview1.reactor.wasm")) {
+        into("pumpkin/native")
+    }
+}
+
+tasks.named("sourcesJar") {
+    dependsOn(generateWitBindings)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 publishing {
-    publications.named<MavenPublication>("kotlinMultiplatform") {
-        artifactId = "pumpkin-api-kt"
-    }
-    publications.named<MavenPublication>("wasmWasi") {
-        artifactId = "pumpkin-api-kt-wasm-wasi"
-    }
-}
-
-val cargoHome = providers.environmentVariable("CARGO_HOME")
-    .orElse(providers.systemProperty("user.home").map { "$it/.cargo" })
-val executableSuffix = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) ".exe" else ""
-val cargoExecutable = cargoHome.map { "$it/bin/cargo$executableSuffix" }
-
-val witDirectory = rootProject.layout.projectDirectory.dir("wit/v0.1")
-val toolVersions = Properties().apply {
-    load(providers.fileContents(rootProject.layout.projectDirectory.file("gradle/tool-versions.properties")).asText.get().reader())
-}
-val witBindgenRevision = toolVersions.getProperty("witBindgenRevision")
-val witBindgenDirectory = layout.projectDirectory.dir("tools/wit-bindgen/$witBindgenRevision")
-val witBindgen = witBindgenDirectory.file("bin/wit-bindgen$executableSuffix")
-val generatedBindings = layout.buildDirectory.dir("generated/wit/wasmWasiMain/kotlin")
-
-val installWitBindgen by tasks.registering(Exec::class) {
-    group = "build setup"
-    description = "Installs Pumpkin's pinned Kotlin binding generator."
-
-    inputs.property("revision", witBindgenRevision)
-    outputs.dir(witBindgenDirectory)
-
-    onlyIf("the pinned binding generator is not already installed") {
-        val manifest = witBindgenDirectory.file(".crates.toml").asFile
-        val matchesRevision = manifest.isFile &&
-            manifest.readText().contains("git+https://github.com/Kotlin/wit-bindgen?rev=$witBindgenRevision#$witBindgenRevision)")
-        val usable = matchesRevision && witBindgen.asFile.isFile && runCatching {
-            val process = ProcessBuilder(witBindgen.asFile.absolutePath, "--version")
-                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
-            try {
-                process.waitFor(10, TimeUnit.SECONDS) && process.exitValue() == 0
-            } finally {
-                if (process.isAlive) process.destroyForcibly()
-            }
-        }.getOrDefault(false)
-        !usable
-    }
-
-    commandLine(
-        cargoExecutable.get(),
-        "install",
-        "wit-bindgen-cli",
-        "--force",
-        "--git", "https://github.com/Kotlin/wit-bindgen",
-        "--rev", witBindgenRevision,
-        "--locked",
-        "--root", witBindgenDirectory.asFile.absolutePath,
-    )
-}
-
-val generateWitBindings by tasks.registering(Exec::class) {
-    group = "build"
-    description = "Generates Kotlin bindings for the published Pumpkin API."
-
-    dependsOn(installWitBindgen)
-    inputs.dir(witDirectory)
-    inputs.file(witBindgen)
-    inputs.property("kotlinPackage", "pumpkin")
-    inputs.property("kotlinImports", "plugin.*")
-    outputs.dir(generatedBindings)
-
-    doFirst {
-        val outputDirectory = generatedBindings.get().asFile
-        check(outputDirectory.deleteRecursively() || !outputDirectory.exists()) {
-            "Could not remove stale bindings from $outputDirectory"
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+            artifactId = "pumpkin-api-java"
         }
-        check(outputDirectory.mkdirs() || outputDirectory.isDirectory) {
-            "Could not create bindings directory $outputDirectory"
-        }
-    }
-
-    commandLine(
-        witBindgen.asFile.absolutePath,
-        "kotlin",
-        "--kotlin-imports", "plugin.*",
-        "--kotlin-package-name", "pumpkin",
-        witDirectory.asFile.absolutePath,
-        "--out-dir", generatedBindings.get().asFile.absolutePath,
-    )
-}
-
-kotlin {
-    sourceSets.named("wasmWasiMain") {
-        kotlin.srcDir(generateWitBindings)
-    }
-}
-
-tasks.named<Jar>("wasmWasiSourcesJar") {
-    from(rootProject.layout.projectDirectory.dir("wit/v0.1")) {
-        into("wit/v0.1")
-    }
-    from(rootProject.layout.projectDirectory.file("wasi_snapshot_preview1.reactor.wasm")) {
-        into("wasi")
     }
 }

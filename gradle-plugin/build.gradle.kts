@@ -1,31 +1,23 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
-    `kotlin-dsl`
     `java-gradle-plugin`
     `maven-publish`
 }
 
-group = "io.github.pumpkin-mc"
+val toolVersions = Properties().apply {
+    rootProject.file("gradle/tool-versions.properties").inputStream().use { load(it) }
+}
+
+group = "io.github.udouble-factory"
 version = providers.gradleProperty("pumpkinApiVersion").getOrElse("0.1.1")
 
 base {
-    archivesName.set("pumpkin-api-kt-gradle-plugin")
+    archivesName.set("pumpkin-api-java-gradle-plugin")
 }
 
 repositories {
-    gradlePluginPortal()
     mavenCentral()
-}
-
-tasks.processResources {
-    from(rootProject.layout.projectDirectory.file("gradle/tool-versions.properties")) {
-        into("io/github/pumpkinmc/gradle")
-    }
-}
-
-dependencies {
-    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0")
 }
 
 java {
@@ -33,23 +25,29 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+dependencies {
+    implementation("org.teavm:teavm-tooling:${toolVersions.getProperty("teaVmVersion")}")
+    implementation("org.apache.commons:commons-compress:1.28.0")
 }
 
-tasks.withType<JavaCompile>().configureEach {
+tasks.compileJava {
     options.release.set(17)
+    options.encoding = "UTF-8"
+}
+
+tasks.processResources {
+    from(rootProject.file("gradle/tool-versions.properties")) {
+        into("io/github/pumpkinmc/gradle")
+    }
 }
 
 gradlePlugin {
     plugins {
         create("pumpkinPlugin") {
-            id = "io.github.pumpkin-mc.plugin"
+            id = "io.github.udouble-factory.pumpkin"
             implementationClass = "io.github.pumpkinmc.gradle.PumpkinPlugin"
-            displayName = "Pumpkin Kotlin plugin build"
-            description = "Builds Kotlin/Wasm Pumpkin plugins from the published API source snapshot."
+            displayName = "Pumpkin Java plugin build"
+            description = "Builds Java Pumpkin plugins as WebAssembly components."
         }
     }
 }
