@@ -1,0 +1,13 @@
+jdk:
+  - openjdk21
+
+before_install:
+  - git submodule update --init --recursive
+  - curl -LsSf https://astral.sh/uv/0.8.22/install.sh -o /tmp/pumpkin-install-uv.sh
+  - UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 sh /tmp/pumpkin-install-uv.sh
+
+install:
+  - >-
+    "$HOME/.local/bin/uv" run --no-project --python 3.13
+    ./gradlew build :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal
+    "-PpumpkinMavenGroup=$GROUP.$ARTIFACT" "-PpumpkinApiVersion=$VERSION" --no-daemon

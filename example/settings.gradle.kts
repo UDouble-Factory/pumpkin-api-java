@@ -1,13 +1,16 @@
 pluginManagement {
-    repositories {
-        val ciRepository = providers.environmentVariable("PUMPKIN_CI_REPOSITORY").orNull
-        if (ciRepository != null) {
-            maven { url = uri(ciRepository) }
-        } else {
-            mavenLocal()
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "io.github.udouble-factory.pumpkin") {
+                useModule("com.github.UDouble-Factory.pumpkin-api-java:gradle-plugin:${requested.version}")
+            }
         }
+    }
+
+    repositories {
         gradlePluginPortal()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

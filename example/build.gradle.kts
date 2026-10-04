@@ -1,21 +1,11 @@
 plugins {
     java
-    id("io.github.udouble-factory.pumpkin") version "0.1.1"
+    id("io.github.udouble-factory.pumpkin") version "<jitpack-version>"
 }
 
 repositories {
-    val ciRepository = providers.environmentVariable("PUMPKIN_CI_REPOSITORY").orNull
-    if (ciRepository != null) {
-        maven { url = uri(ciRepository) }
-    } else {
-        mavenLocal()
-    }
     mavenCentral()
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    maven { url = uri("https://jitpack.io") }
 }
 
 tasks.compileJava {
@@ -24,6 +14,7 @@ tasks.compileJava {
 }
 
 pumpkin {
-    apiVersion.set("0.1.1")
+    apiGroup.set("com.github.UDouble-Factory.pumpkin-api-java")
+    apiVersion.set("<jitpack-version>")
     pluginClass.set("example.ExamplePlugin")
 }

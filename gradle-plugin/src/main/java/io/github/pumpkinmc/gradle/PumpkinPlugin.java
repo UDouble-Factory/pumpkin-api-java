@@ -92,7 +92,7 @@ public final class PumpkinPlugin implements Plugin<Project> {
         project.getTasks().named("check").configure(task -> task.dependsOn(assemble));
 
         project.afterEvaluate(ignored -> {
-            String coordinates = "io.github.udouble-factory:pumpkin-api-java:" + extension.getApiVersion().get();
+            String coordinates = extension.getApiGroup().get() + ":pumpkin-api-java:" + extension.getApiVersion().get();
             project.getDependencies().add("implementation", coordinates);
             project.getDependencies().add(nativeApi.getName(), coordinates);
         });

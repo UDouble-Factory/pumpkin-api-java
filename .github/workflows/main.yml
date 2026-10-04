@@ -50,8 +50,27 @@ jobs:
         run: echo "PUMPKIN_CI_REPOSITORY=$RUNNER_TEMP/pumpkin-maven" >> "$GITHUB_ENV"
       - name: Build, test and publish development packages
         run: ./gradlew build :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal -Dmaven.repo.local="$PUMPKIN_CI_REPOSITORY" --no-daemon
-      - name: Build Java example
-        run: ./gradlew -p example build --no-daemon
+      - name: Prepare template verification project
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+
+          destination = Path("build/template-check")
+          shutil.copytree("example", destination, ignore=shutil.ignore_patterns("build", ".gradle", ".idea"))
+          repository = Path(os.environ["PUMPKIN_CI_REPOSITORY"]).resolve().as_uri()
+
+          for name in ("settings.gradle.kts", "build.gradle.kts"):
+              path = destination / name
+              contents = path.read_text(encoding="utf-8")
+              contents = contents.replace("<jitpack-version>", "0.1.1")
+              contents = contents.replace("com.github.UDouble-Factory.pumpkin-api-java", "io.github.udouble-factory")
+              contents = contents.replace("https://jitpack.io", repository)
+              path.write_text(contents, encoding="utf-8")
+          PY
+      - name: Build template verification project
+        run: ./gradlew -p build/template-check build --no-daemon
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +78,7 @@ jobs:
           path: |
             api/build/libs/*.jar
             gradle-plugin/build/libs/*.jar
-            example/build/pumpkin-example.wasm
+            build/template-check/build/pumpkin-example.wasm
 
   release:
     needs: build
