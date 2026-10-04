@@ -2,7 +2,7 @@
 
 Copy this directory to start an independent Pumpkin plugin project. Use JDK 17 or later; the Gradle wrapper is included.
 
-1. In `build.gradle.kts`, replace both `<jitpack-version>` placeholders with the same successfully built JitPack tag or commit. Keep the `v` prefix if the tag has one.
+1. In this template's `gradle.properties`, set `pumpkin_api_version` to a successfully built JitPack tag or commit. This version applies to both the API and Gradle plugin. Keep the `v` prefix if the tag has one.
 2. In `settings.gradle.kts`, change `rootProject.name` to your plugin's name.
 3. Edit `src/main/java/example/ExamplePlugin.java`, including its metadata. If you rename or move the class, update `pumpkin.pluginClass` in `build.gradle.kts`.
 

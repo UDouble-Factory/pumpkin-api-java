@@ -12,16 +12,28 @@ Create a Gradle project with a Gradle 9.x wrapper and JDK 17 or later.
 
 You can copy the [plugin template](example/) to a new directory, or create the following files yourself. The template is an independent project that downloads the published packages from JitPack.
 
-Replace both `<jitpack-version>` placeholders below with the same Git tag or commit. A tag's `v` prefix is part of the version. Existing tags created before the JitPack configuration do not include it.
+In your plugin project's `gradle.properties`, set the version used by both the API and Gradle plugin:
+
+```properties
+pumpkin_api_version=<jitpack-version>
+```
+
+Replace `<jitpack-version>` with a successfully built Git tag or commit. A tag's `v` prefix is part of the version. Existing tags created before the JitPack configuration do not include it.
 
 In `settings.gradle.kts`:
 
 ```kotlin
 pluginManagement {
+    val pumpkin_api_version = providers.gradleProperty("pumpkin_api_version").get()
+
+    plugins {
+        id("io.github.udouble-factory.pumpkin") version pumpkin_api_version
+    }
+
     resolutionStrategy {
         eachPlugin {
             if (requested.id.id == "io.github.udouble-factory.pumpkin") {
-                useModule("com.github.UDouble-Factory.pumpkin-api-java:gradle-plugin:${requested.version}")
+                useModule("com.github.UDouble-Factory.pumpkin-api-java:gradle-plugin:$pumpkinApiVersion")
             }
         }
     }
@@ -41,7 +53,7 @@ In `build.gradle.kts`:
 ```kotlin
 plugins {
     java
-    id("io.github.udouble-factory.pumpkin") version "<jitpack-version>"
+    id("io.github.udouble-factory.pumpkin")
 }
 
 repositories {
@@ -56,7 +68,7 @@ tasks.compileJava {
 
 pumpkin {
     apiGroup.set("com.github.UDouble-Factory.pumpkin-api-java")
-    apiVersion.set("<jitpack-version>")
+    apiVersion.set(providers.gradleProperty("pumpkin_api_version"))
     pluginClass.set("example.MyPlugin")
 }
 ```
@@ -131,7 +143,7 @@ git submodule update --init --recursive
 ./gradlew :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal
 ```
 
-For a local consumer, remove the JitPack `resolutionStrategy` above, use `mavenLocal()` in both repository blocks, set the plugin version and `pumpkin.apiVersion` to `0.1.1`, and omit `pumpkin.apiGroup` so it defaults to `io.github.udouble-factory`. After republishing changes under the same version, run `./gradlew build --refresh-dependencies` in the consumer.
+For a local consumer, remove the JitPack `resolutionStrategy` above, use `mavenLocal()` in both repository blocks, set `pumpkin_api_version=0.1.1` in the consumer's `gradle.properties`, and omit `pumpkin.apiGroup` so it defaults to `io.github.udouble-factory`. After republishing changes under the same version, run `./gradlew build --refresh-dependencies` in the consumer.
 
 The [example](example/) directory is a standalone plugin template. CI copies it to `build/template-check` and changes only that copy to use the temporary Maven repository and development version, then verifies the resulting WebAssembly component.
 
@@ -139,11 +151,11 @@ The root build checks `api` and `gradle-plugin` automatically. Tool versions liv
 
 ### JitPack publishing
 
-`jitpack.yml` selects JDK 21, initializes the WIT submodule, and uses uv to provide Python 3.13 while running the Gradle build and local Maven publication tasks. The JitPack environment supplies the repository group, name, and requested version through `GROUP`, `ARTIFACT`, and `VERSION`; these become `pumpkinMavenGroup` and `pumpkinApiVersion` Gradle properties for both modules.
+`jitpack.yml` selects JDK 21, initializes the WIT submodule, and uses uv to provide Python 3.13 while running the Gradle build and local Maven publication tasks. The JitPack environment supplies the repository group, name, and requested version through `GROUP`, `ARTIFACT`, and `VERSION`; these become `pumpkinMavenGroup` and `pumpkin_api_version` Gradle properties for both modules.
 
 The published module coordinates are `com.github.UDouble-Factory.pumpkin-api-java:pumpkin-api-java:<jitpack-version>` for the API and `com.github.UDouble-Factory.pumpkin-api-java:gradle-plugin:<jitpack-version>` for the build plugin. The consumer uses `useModule(...)` to resolve the plugin directly without relying on its original plugin marker coordinates.
 
-Push the configuration and create a new tag, or select that commit on [JitPack](https://jitpack.io/#UDouble-Factory/pumpkin-api-java), then request a build and check its log. To use the published packages, copy the template, replace both `<jitpack-version>` placeholders in its `build.gradle.kts` with that tag or commit, and run from the copied directory:
+Push the configuration and create a new tag, or select that commit on [JitPack](https://jitpack.io/#UDouble-Factory/pumpkin-api-java), then request a build and check its log. To use the published packages, copy the template, set `pumpkin_api_version` in its `gradle.properties` to that tag or commit, and run from the copied directory:
 
 ```sh
 ./gradlew build

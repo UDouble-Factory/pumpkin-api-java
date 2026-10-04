@@ -1,6 +1,6 @@
 plugins {
     java
-    id("io.github.udouble-factory.pumpkin") version "<jitpack-version>"
+    id("io.github.udouble-factory.pumpkin")
 }
 
 repositories {
@@ -15,6 +15,6 @@ tasks.compileJava {
 
 pumpkin {
     apiGroup.set("com.github.UDouble-Factory.pumpkin-api-java")
-    apiVersion.set("<jitpack-version>")
+    apiVersion.set(providers.gradleProperty("pumpkin_api_version"))
     pluginClass.set("example.ExamplePlugin")
 }

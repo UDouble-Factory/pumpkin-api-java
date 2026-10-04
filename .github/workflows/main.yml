@@ -61,7 +61,7 @@ jobs:
           shutil.copytree("example", destination, ignore=shutil.ignore_patterns("build", ".gradle", ".idea"))
           repository = Path(os.environ["PUMPKIN_CI_REPOSITORY"]).resolve().as_uri()
 
-          for name in ("settings.gradle.kts", "build.gradle.kts"):
+          for name in ("settings.gradle.kts", "build.gradle.kts", "gradle.properties"):
               path = destination / name
               contents = path.read_text(encoding="utf-8")
               contents = contents.replace("<jitpack-version>", "0.1.1")
