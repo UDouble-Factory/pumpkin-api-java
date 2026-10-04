@@ -10,7 +10,7 @@ val toolVersions = Properties().apply {
 }
 
 group = providers.gradleProperty("pumpkinMavenGroup").getOrElse("io.github.udouble-factory")
-version = providers.gradleProperty("pumpkin_api_version").getOrElse("0.1.1")
+version = providers.gradleProperty("pumpkin_api_version").getOrElse("0.1.2")
 
 base {
     archivesName.set("pumpkin-api-java")

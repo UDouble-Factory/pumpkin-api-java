@@ -12,7 +12,7 @@ public class PumpkinExtension {
     @Inject
     public PumpkinExtension(ObjectFactory objects) {
         apiGroup = objects.property(String.class).convention("io.github.udouble-factory");
-        apiVersion = objects.property(String.class).convention("0.1.1");
+        apiVersion = objects.property(String.class).convention("0.1.2");
         pluginClass = objects.property(String.class);
     }
 

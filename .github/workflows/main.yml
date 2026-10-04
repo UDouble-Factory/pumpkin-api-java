@@ -64,7 +64,7 @@ jobs:
           for name in ("settings.gradle.kts", "build.gradle.kts", "gradle.properties"):
               path = destination / name
               contents = path.read_text(encoding="utf-8")
-              contents = contents.replace("<jitpack-version>", "0.1.1")
+              contents = contents.replace("<jitpack-version>", "0.1.2")
               contents = contents.replace("com.github.UDouble-Factory.pumpkin-api-java", "io.github.udouble-factory")
               contents = contents.replace("https://jitpack.io", repository)
               path.write_text(contents, encoding="utf-8")
