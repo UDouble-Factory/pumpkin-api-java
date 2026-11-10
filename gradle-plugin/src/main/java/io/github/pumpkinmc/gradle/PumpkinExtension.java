@@ -11,8 +11,8 @@ public class PumpkinExtension {
 
     @Inject
     public PumpkinExtension(ObjectFactory objects) {
-        apiGroup = objects.property(String.class).convention("io.github.udouble-factory");
-        apiVersion = objects.property(String.class).convention("0.1.3");
+        apiGroup = objects.property(String.class).convention(ToolVersions.get("apiGroup"));
+        apiVersion = objects.property(String.class).convention(ToolVersions.get("apiVersion"));
         pluginClass = objects.property(String.class);
     }
 

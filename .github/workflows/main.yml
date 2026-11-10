@@ -60,11 +60,13 @@ jobs:
           destination = Path("build/template-check")
           shutil.copytree("example", destination, ignore=shutil.ignore_patterns("build", ".gradle", ".idea"))
           repository = Path(os.environ["PUMPKIN_CI_REPOSITORY"]).resolve().as_uri()
+          properties = Path("gradle.properties").read_text(encoding="utf-8").splitlines()
+          version = next(line.split("=", 1)[1].strip() for line in properties if line.startswith("pumpkin_api_version="))
 
           for name in ("settings.gradle.kts", "build.gradle.kts", "gradle.properties"):
               path = destination / name
               contents = path.read_text(encoding="utf-8")
-              contents = contents.replace("<jitpack-version>", "0.1.3")
+              contents = contents.replace("<jitpack-version>", version)
               contents = contents.replace("com.github.UDouble-Factory.pumpkin-api-java", "io.github.udouble-factory")
               contents = contents.replace("https://jitpack.io", repository)
               path.write_text(contents, encoding="utf-8")

@@ -3,9 +3,15 @@ package io.github.pumpkinmc.gradle;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.zip.ZipInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -78,6 +84,14 @@ final class NativeTools {
     private void install(Path directory, String url, String executable) throws IOException {
         if (Files.isRegularFile(directory.resolve("installed"))) return;
         Files.createDirectories(directory);
+
+        try (FileChannel channel = FileChannel.open(directory.resolve("install.lock"), StandardOpenOption.CREATE, StandardOpenOption.WRITE); FileLock ignored = channel.lock()) {
+            if (Files.isRegularFile(directory.resolve("installed"))) return;
+            download(directory, url, executable);
+        }
+    }
+
+    private void download(Path directory, String url, String executable) throws IOException {
         Path archive = directory.resolve(url.endsWith(".zip") ? "download.zip" : "download.tar.gz");
         if (!Files.isRegularFile(archive)) {
             System.out.println("Downloading " + url);
@@ -87,6 +101,8 @@ final class NativeTools {
             }
             Files.move(temporary, archive, StandardCopyOption.REPLACE_EXISTING);
         }
+        verify(archive, url.substring(url.lastIndexOf('/') + 1));
+
         if (url.endsWith(".zip")) {
             try (ZipInputStream input = new ZipInputStream(Files.newInputStream(archive))) {
                 java.util.zip.ZipEntry entry;
@@ -122,6 +138,30 @@ final class NativeTools {
         }
         find(directory, executable).toFile().setExecutable(true, false);
         Files.writeString(directory.resolve("installed"), url);
+    }
+
+    private void verify(Path archive, String name) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException(failure);
+        }
+
+        try (InputStream input = Files.newInputStream(archive)) {
+            byte[] buffer = new byte[65536];
+            int count;
+            while ((count = input.read(buffer)) > 0) {
+                digest.update(buffer, 0, count);
+            }
+        }
+
+        String expected = ToolVersions.get("sha256." + name);
+        String actual = HexFormat.of().formatHex(digest.digest());
+        if (!actual.equals(expected)) {
+            Files.delete(archive);
+            throw new IOException("Checksum mismatch for " + name + ": expected " + expected + ", got " + actual);
+        }
     }
 
     private Path entryPath(Path directory, String name) throws IOException {

@@ -9,9 +9,6 @@ val toolVersions = Properties().apply {
     rootProject.file("gradle/tool-versions.properties").inputStream().use { load(it) }
 }
 
-group = providers.gradleProperty("pumpkinMavenGroup").getOrElse("io.github.udouble-factory")
-version = providers.gradleProperty("pumpkin_api_version").getOrElse("0.1.3")
-
 base {
     archivesName.set("pumpkin-api-java-gradle-plugin")
 }
@@ -35,8 +32,15 @@ tasks.compileJava {
     options.encoding = "UTF-8"
 }
 
+val buildProperties by tasks.registering(WriteProperties::class) {
+    destinationFile.set(layout.buildDirectory.file("generated/pumpkin/tool-versions.properties"))
+    toolVersions.forEach { name, value -> property(name.toString(), value.toString()) }
+    property("apiGroup", project.group.toString())
+    property("apiVersion", project.version.toString())
+}
+
 tasks.processResources {
-    from(rootProject.file("gradle/tool-versions.properties")) {
+    from(buildProperties) {
         into("io/github/pumpkinmc/gradle")
     }
 }

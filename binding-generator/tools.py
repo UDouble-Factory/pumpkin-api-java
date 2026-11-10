@@ -1,3 +1,4 @@
+import hashlib
 import os
 import pathlib
 import platform
@@ -8,7 +9,7 @@ import urllib.request
 import zipfile
 
 
-def executable(name, version, cache):
+def executable(name, version, cache, checksums):
     override = os.environ.get(name.upper().replace("-", "_"))
     if override:
         path = pathlib.Path(override)
@@ -29,6 +30,14 @@ def executable(name, version, cache):
             if not archive.exists():
                 urllib.request.urlretrieve(url, partial)
                 partial.replace(archive)
+
+            with archive.open("rb") as file:
+                actual = hashlib.file_digest(file, "sha256").hexdigest()
+            expected = checksums["sha256." + filename]
+            if actual != expected:
+                archive.unlink()
+                raise ValueError(f"Checksum mismatch for {filename}: expected {expected}, got {actual}")
+
             unpacked = directory / "unpacked"
             unpacked.mkdir(exist_ok=True)
             if extension == "zip":

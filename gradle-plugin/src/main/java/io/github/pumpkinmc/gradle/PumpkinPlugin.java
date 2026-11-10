@@ -76,17 +76,15 @@ public final class PumpkinPlugin implements Plugin<Project> {
             task.getMainClass().set(NativeCompiler.class.getName());
             task.setClasspath(compiler.plus(project.files(location)));
             task.setMaxHeapSize("2g");
-            task.getInputs().files(source.getRuntimeClasspath()).withPropertyName("pluginClasspath");
-            task.getInputs().dir(nativeDirectory);
-            task.getInputs().property("pluginClass", extension.getPluginClass());
-            task.getOutputs().file(project.getLayout().getBuildDirectory().file(project.getName() + ".wasm"));
-            task.doFirst(ignored -> task.setArgs(java.util.List.of(
-                source.getRuntimeClasspath().getAsPath(),
-                nativeDirectory.get().dir("pumpkin/native").getAsFile().getAbsolutePath(),
-                project.getLayout().getBuildDirectory().dir("pumpkin/compiled").get().getAsFile().getAbsolutePath(),
-                project.getLayout().getBuildDirectory().file(project.getName() + ".wasm").get().getAsFile().getAbsolutePath(),
-                new File(project.getGradle().getGradleUserHomeDir(), "caches/pumpkin-java/tools").getAbsolutePath()
-            )));
+            task.getArgumentProviders().add(new CompilerArguments(
+                source.getRuntimeClasspath(),
+                nativeDirectory,
+                project.getLayout().getBuildDirectory().dir("pumpkin/compiled"),
+                project.getLayout().getBuildDirectory().file(project.getName() + ".wasm"),
+                new File(project.getGradle().getGradleUserHomeDir(), "caches/pumpkin-java"),
+                project.getProviders().environmentVariable("WASI_SDK_PATH"),
+                project.getProviders().environmentVariable("WASM_TOOLS")
+            ));
         });
         project.getTasks().named("assemble").configure(task -> task.dependsOn(assemble));
         project.getTasks().named("check").configure(task -> task.dependsOn(assemble));

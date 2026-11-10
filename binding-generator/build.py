@@ -16,8 +16,8 @@ def main():
     parser.add_argument("--versions", required=True, type=pathlib.Path)
     args = parser.parse_args()
     versions = dict(line.split("=", 1) for line in args.versions.read_text().splitlines() if line and not line.startswith("#"))
-    bindgen = executable("wit-bindgen", versions["witBindgenVersion"], args.cache)
-    wasm_tools = executable("wasm-tools", versions["wasmToolsVersion"], args.cache)
+    bindgen = executable("wit-bindgen", versions["witBindgenVersion"], args.cache, versions)
+    wasm_tools = executable("wasm-tools", versions["wasmToolsVersion"], args.cache, versions)
     generated = args.output.resolve()
     native = generated / "native"
     java = (generated / "java").resolve()
