@@ -128,7 +128,7 @@ On the first exported callback, the bridge constructs and caches your plugin ins
 
 Choose an API version compatible with your Pumpkin server. Errors such as `no export ... found`, `type-checking export func ...`, or missing imports indicate a possible mismatch between the plugin's packaged WIT and the server's contract. Update `pumpkin.apiVersion` to a compatible release and rebuild the component.
 
-Use `pumpkin_api_version=v0.1.3-java` with Pumpkin `0.2.1+26.3-26.51` and the current server `master`. The pinned WIT snapshot is `ad9fab4f2aea2206abb3dc864dd338ba45bab7ba`; its `v0.1` tree matches `crates/pumpkin-plugin-wit/v0.1` in server release commit `224f9f8144ca53a8d0800acb87607d714196e2a6` and in server `master` commit `3ea7d281654a03fdc4f4fee43734c098acd1fb52`. Use `v0.1.2-java` with Pumpkin `0.2.0+26.3-26.51`; the two releases use different event layouts and are not interchangeable.
+Use `pumpkin_api_version=v0.1.4-java` with Pumpkin `0.2.1+26.3-26.51` and the current server `master`. The pinned WIT snapshot is `ad9fab4f2aea2206abb3dc864dd338ba45bab7ba`; its `v0.1` tree matches `crates/pumpkin-plugin-wit/v0.1` in server release commit `224f9f8144ca53a8d0800acb87607d714196e2a6` and in server `master` commit `3ea7d281654a03fdc4f4fee43734c098acd1fb52`. Use `v0.1.2-java` with Pumpkin `0.2.0+26.3-26.51`; the two releases use different event layouts and are not interchangeable.
 
 Matching the `0.1.0` WIT package label alone is insufficient. Java library support follows TeaVM, so arbitrary JVM libraries, JNI, and dynamic class loading are not automatically supported.
 
@@ -145,7 +145,7 @@ git submodule update --init --recursive
 ./gradlew :api:publishToMavenLocal :gradle-plugin:publishToMavenLocal
 ```
 
-For a local consumer, remove the JitPack `resolutionStrategy` above, use `mavenLocal()` in both repository blocks, set `pumpkin_api_version=0.1.3` in the consumer's `gradle.properties`, and omit `pumpkin.apiGroup` so it defaults to `io.github.udouble-factory`. After republishing changes under the same version, run `./gradlew build --refresh-dependencies` in the consumer.
+For a local consumer, remove the JitPack `resolutionStrategy` above, use `mavenLocal()` in both repository blocks, set `pumpkin_api_version=0.1.4` in the consumer's `gradle.properties`, and omit `pumpkin.apiGroup` so it defaults to `io.github.udouble-factory`. After republishing changes under the same version, run `./gradlew build --refresh-dependencies` in the consumer.
 
 The [example](example/) directory is a standalone plugin template. CI copies it to `build/template-check` and changes only that copy to use the temporary Maven repository and development version, then verifies the resulting WebAssembly component.
 
