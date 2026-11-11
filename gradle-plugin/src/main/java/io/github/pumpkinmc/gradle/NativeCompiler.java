@@ -27,17 +27,21 @@ import org.teavm.vm.TeaVMOptimizationLevel;
 
 public final class NativeCompiler {
     private static final int UNITS = 32;
+    private static final int MIN_HEAP_MB = 16;
+    private static final int MAX_HEAP_MB = 1536;
     private static final List<String> API_SOURCES = List.of("pumpkin_runtime.c", "pumpkin_bridge.c", "plugin.c");
 
     private NativeCompiler() {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 5) throw new IllegalArgumentException("Expected classpath, native directory, work directory, output component, cache directory");
+        if (args.length != 6) throw new IllegalArgumentException("Expected classpath, native directory, work directory, output component, cache directory, max heap megabytes");
         Path nativeDirectory = Path.of(args[1]);
         Path work = Path.of(args[2]).toAbsolutePath().normalize();
         Path output = Path.of(args[3]);
         Path cache = Path.of(args[4]);
+        int maxHeapMb = Integer.parseInt(args[5]);
+        if (maxHeapMb < MIN_HEAP_MB || maxHeapMb > MAX_HEAP_MB) throw new IllegalArgumentException("pumpkin.maxHeapMb must be between " + MIN_HEAP_MB + " and " + MAX_HEAP_MB);
         Path generated = work.resolve("java-c");
         if (!generated.toAbsolutePath().normalize().startsWith(work)) throw new IOException("Generated sources escape the work directory");
         clear(generated);
@@ -55,7 +59,7 @@ public final class NativeCompiler {
             tool.setEntryPointName("pumpkin_java_main");
             tool.setOptimizationLevel(TeaVMOptimizationLevel.ADVANCED);
             tool.setMinHeapSize(4 * 1024 * 1024);
-            tool.setMaxHeapSize(128 * 1024 * 1024);
+            tool.setMaxHeapSize(maxHeapMb * 1024 * 1024);
             tool.setLog(new ConsoleTeaVMToolLog(false));
             tool.getTransformers().add(ShiftCounts.class.getName());
             tool.generate();

@@ -28,7 +28,7 @@ final class WasiRuntime {
         int start = source.indexOf("#if defined(__EMSCRIPTEN__)");
         int end = source.indexOf("#elif TEAVM_UNIX", start);
         if (start < 0 || end < 0) throw new IOException("Unsupported TeaVM memory runtime layout");
-        source = source.substring(0, start) + "#if defined(__wasi__)\n    static void* teavm_virtualAlloc(int64_t size) {\n        return calloc(1, (size_t) size);\n    }\n    static void teavm_virtualCommit(void* address, int64_t size) {\n    }\n    static void teavm_virtualUncommit(void* address, int64_t size) {\n        memset(address, 0, (size_t) size);\n    }\n    static int64_t teavm_pageSize() {\n        return 65536;\n    }\n" + source.substring(end);
+        source = source.substring(0, start) + "#if defined(__wasi__)\n    #include <stdio.h>\n    #include <unistd.h>\n    static void* teavm_virtualAlloc(int64_t size) {\n        void* address = sbrk((intptr_t) size);\n        if (address == (void*) -1) {\n            fputs(\"Pumpkin Java: cannot reserve memory for the Java heap\\n\", stderr);\n            abort();\n        }\n        return address;\n    }\n    static void teavm_virtualCommit(void* address, int64_t size) {\n    }\n    static void teavm_virtualUncommit(void* address, int64_t size) {\n        memset(address, 0, (size_t) size);\n    }\n    static int64_t teavm_pageSize() {\n        return 65536;\n    }\n" + source.substring(end);
         Files.writeString(memory, source);
         Files.copy(nativeDirectory.resolve("pumpkin_fiber.c"), generated.resolve("fiber.c"), StandardCopyOption.REPLACE_EXISTING);
         Path files = generated.resolve("file.c");
@@ -48,6 +48,7 @@ final class WasiRuntime {
         fixArrayDataOffset(generated);
         fixArrayClone(generated);
         guardArraySize(generated);
+        fixHeapGrowth(generated);
     }
 
     private static void fixArrayDataOffset(Path generated) throws IOException {
@@ -80,6 +81,13 @@ final class WasiRuntime {
 
         source = "#include <stdio.h>\n" + allocation.replaceFirst("$0\n    if ($1 < 0) {\n        fputs(\"Pumpkin Java: array size cannot be negative\\\\n\", stderr);\n        abort();\n    }\n    if ($1 > INT32_C(0x0FFFFFF0)) {\n        teavm_outOfMemory();\n    }");
         Files.writeString(allocator, source);
+    }
+
+    private static void fixHeapGrowth(Path generated) throws IOException {
+        Path collector = generated.resolve("classes/org/teavm/runtime/GC.c");
+        String source = Files.readString(collector);
+        source = rename(source, "return (teavm_gc_availableBytes + ((int64_t) teavm_local_1));", "return (teavm_gc_availableBytes + ((int64_t) teavm_local_1) + INT64_C(16));");
+        Files.writeString(collector, source);
     }
 
     private static String rename(String source, String expected, String replacement) throws IOException {

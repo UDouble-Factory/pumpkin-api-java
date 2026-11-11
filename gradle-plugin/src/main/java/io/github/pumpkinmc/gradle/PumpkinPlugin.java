@@ -83,7 +83,8 @@ public final class PumpkinPlugin implements Plugin<Project> {
                 project.getLayout().getBuildDirectory().file(project.getName() + ".wasm"),
                 new File(project.getGradle().getGradleUserHomeDir(), "caches/pumpkin-java"),
                 project.getProviders().environmentVariable("WASI_SDK_PATH"),
-                project.getProviders().environmentVariable("WASM_TOOLS")
+                project.getProviders().environmentVariable("WASM_TOOLS"),
+                extension.getMaxHeapMb()
             ));
         });
         project.getTasks().named("assemble").configure(task -> task.dependsOn(assemble));

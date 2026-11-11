@@ -24,8 +24,9 @@ final class CompilerArguments implements CommandLineArgumentProvider {
     private final File cacheDirectory;
     private final Provider<String> wasiSdkPath;
     private final Provider<String> wasmTools;
+    private final Provider<Integer> maxHeapMb;
 
-    CompilerArguments(FileCollection pluginClasspath, Provider<Directory> nativeDirectory, Provider<Directory> workDirectory, Provider<RegularFile> component, File cacheDirectory, Provider<String> wasiSdkPath, Provider<String> wasmTools) {
+    CompilerArguments(FileCollection pluginClasspath, Provider<Directory> nativeDirectory, Provider<Directory> workDirectory, Provider<RegularFile> component, File cacheDirectory, Provider<String> wasiSdkPath, Provider<String> wasmTools, Provider<Integer> maxHeapMb) {
         this.pluginClasspath = pluginClasspath;
         this.nativeDirectory = nativeDirectory;
         this.workDirectory = workDirectory;
@@ -33,6 +34,7 @@ final class CompilerArguments implements CommandLineArgumentProvider {
         this.cacheDirectory = cacheDirectory;
         this.wasiSdkPath = wasiSdkPath;
         this.wasmTools = wasmTools;
+        this.maxHeapMb = maxHeapMb;
     }
 
     @Classpath
@@ -73,6 +75,11 @@ final class CompilerArguments implements CommandLineArgumentProvider {
         return wasmTools;
     }
 
+    @Input
+    public Provider<Integer> getMaxHeapMb() {
+        return maxHeapMb;
+    }
+
     @Override
     public Iterable<String> asArguments() {
         return List.of(
@@ -80,7 +87,8 @@ final class CompilerArguments implements CommandLineArgumentProvider {
             nativeDirectory.get().dir("pumpkin/native").getAsFile().getAbsolutePath(),
             workDirectory.get().getAsFile().getAbsolutePath(),
             component.get().getAsFile().getAbsolutePath(),
-            cacheDirectory.getAbsolutePath()
+            cacheDirectory.getAbsolutePath(),
+            String.valueOf(maxHeapMb.get())
         );
     }
 }
