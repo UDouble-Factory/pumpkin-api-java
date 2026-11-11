@@ -57,6 +57,7 @@ public final class NativeCompiler {
             tool.setMinHeapSize(4 * 1024 * 1024);
             tool.setMaxHeapSize(128 * 1024 * 1024);
             tool.setLog(new ConsoleTeaVMToolLog(false));
+            tool.getTransformers().add(ShiftCounts.class.getName());
             tool.generate();
             if (!tool.getProblemProvider().getSevereProblems().isEmpty()) {
                 TeaVMProblemRenderer.describeProblems(tool.getDependencyInfo().getCallGraph(), tool.getProblemProvider(), new ConsoleTeaVMToolLog(false));
@@ -68,7 +69,7 @@ public final class NativeCompiler {
         Path clang = tools.clang();
         Path wasmTools = tools.wasmTools();
         Path core = work.resolve("plugin.core.wasm");
-        List<String> flags = List.of("-O2", "-fno-strict-aliasing", "-fwrapv", "-mllvm", "-wasm-enable-sjlj", "-mllvm", "-wasm-use-legacy-eh=false", "-D_WASI_EMULATED_MMAN", "-D_WASI_EMULATED_PROCESS_CLOCKS", "-Wno-parentheses-equality", "-Wno-tautological-compare", "-Wno-constant-conversion");
+        List<String> flags = List.of("-O2", "-fno-strict-aliasing", "-fwrapv", "-fno-strict-float-cast-overflow", "-mllvm", "-wasm-enable-sjlj", "-mllvm", "-wasm-use-legacy-eh=false", "-D_WASI_EMULATED_MMAN", "-D_WASI_EMULATED_PROCESS_CLOCKS", "-Wno-parentheses-equality", "-Wno-tautological-compare", "-Wno-constant-conversion");
 
         List<String> command = new ArrayList<>();
         command.add(clang.toString());

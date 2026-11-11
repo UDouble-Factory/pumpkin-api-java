@@ -4,8 +4,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class WasiRuntime {
+    private static final Pattern CLONE_ITEM_SIZE = Pattern.compile("(\\w+_RuntimeClass_isPrimitive)\\((\\w+)\\)\\) \\? sizeof\\(void\\*\\) : TEAVM_FIELD\\(TEAVM_FIELD\\(\\2, TeaVM_Class, itemType\\), TeaVM_Class, size\\)");
+    private static final Pattern ARRAY_ALLOCATION = Pattern.compile("void\\* \\w+_Allocator_allocateArray\\(void\\* \\w+, int32_t (\\w+)\\) \\{");
+
     private WasiRuntime() {
     }
 
@@ -39,10 +44,46 @@ final class WasiRuntime {
         source = rename(source, "char* teavm_char16ToMb(char16_t*", "static char* pumpkin_legacyChar16ToMb(char16_t*");
         Files.copy(nativeDirectory.resolve("pumpkin_utf8.inc"), generated.resolve("pumpkin_utf8.inc"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(strings, source + "\n#include \"pumpkin_utf8.inc\"\n");
+
+        fixArrayDataOffset(generated);
+        fixArrayClone(generated);
+        guardArraySize(generated);
+    }
+
+    private static void fixArrayDataOffset(Path generated) throws IOException {
+        Path core = generated.resolve("core.h");
+        String source = Files.readString(core);
+        source = rename(source, "((type*) TEAVM_ALIGN((((TeaVM_Array*) (array)) + 1), sizeof(type)))", "((type*) ((char*) (array) + (sizeof(TeaVM_Array) + sizeof(type) - 1) / sizeof(type) * sizeof(type)))");
+        Files.writeString(core, source);
+
+        Path reflection = generated.resolve("reflection.c");
+        source = Files.readString(reflection);
+        source = rename(source, "TEAVM_ALIGN(((TeaVM_Array*) array) + 1, size)", "((char*) array + (sizeof(TeaVM_Array) + size - 1) / size * size)");
+        Files.writeString(reflection, source);
+    }
+
+    private static void fixArrayClone(Path generated) throws IOException {
+        Path object = generated.resolve("classes/java/lang/Object.c");
+        String source = Files.readString(object);
+        Matcher itemSize = CLONE_ITEM_SIZE.matcher(source);
+        if (!itemSize.find()) throw new IOException("Unsupported TeaVM array clone layout");
+
+        source = itemSize.replaceAll("$1(TEAVM_FIELD($2, TeaVM_Class, itemType))) ? sizeof(void*) : TEAVM_FIELD(TEAVM_FIELD($2, TeaVM_Class, itemType), TeaVM_Class, size)");
+        Files.writeString(object, source);
+    }
+
+    private static void guardArraySize(Path generated) throws IOException {
+        Path allocator = generated.resolve("classes/org/teavm/runtime/Allocator.c");
+        String source = Files.readString(allocator);
+        Matcher allocation = ARRAY_ALLOCATION.matcher(source);
+        if (!allocation.find()) throw new IOException("Unsupported TeaVM array allocation layout");
+
+        source = "#include <stdio.h>\n" + allocation.replaceFirst("$0\n    if ($1 < 0) {\n        fputs(\"Pumpkin Java: array size cannot be negative\\\\n\", stderr);\n        abort();\n    }\n    if ($1 > INT32_C(0x0FFFFFF0)) {\n        teavm_outOfMemory();\n    }");
+        Files.writeString(allocator, source);
     }
 
     private static String rename(String source, String expected, String replacement) throws IOException {
-        if (!source.contains(expected)) throw new IOException("Unsupported TeaVM string runtime layout: " + expected);
+        if (!source.contains(expected)) throw new IOException("Unsupported TeaVM runtime layout: " + expected);
         return source.replace(expected, replacement);
     }
 }
